@@ -8,7 +8,7 @@ import logging
 
 # Import your agent logic
 from chat_history import get_chat_history
-from agent import run_supervisor
+from agent import run_supervisor,create_new_chat_session
 from qna_data import PREDEFINED_QAS
 from chat_history import get_user_chat_sessions
 
@@ -72,11 +72,11 @@ def chat():
             if category in category_mapping:
                 question = category_mapping[category]
                 if question in PREDEFINED_QAS:
-                                        # Save both user and AI message to DB
+                    # Save both user and AI message to DB
                     history, user_id, session_id = get_chat_history(
                         session.get("user_id"), session.get("session_id")
                     )
-                    history.add_user_message(user_message)
+                    
                     history.add_ai_message(PREDEFINED_QAS[question])
                     return jsonify({"reply": PREDEFINED_QAS[question]})
 
@@ -84,10 +84,9 @@ def chat():
         history, user_id, session_id = get_chat_history(
             session.get("user_id"), session.get("session_id")
         )
-        history.add_user_message(user_message)
         # Run AI (run_supervisor handles saving both user and AI messages)
         assistant_reply = run_supervisor(user_message, history)
-
+        
         return jsonify({"reply": assistant_reply,"session_id": session_id})
     except Exception as e:
         logging.exception("Error in /api/chat")
@@ -176,23 +175,23 @@ def health():
 # ---------------------------
 # Sessions for sidebar
 # ---------------------------
+#creates a new chat session and returns the session_id
+@app.route("/api/chat/new_session", methods=["POST"])
+def new_chat_session():
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"error": "User not authenticated"}), 401
+
+    session_id = create_new_chat_session(user_id)
+    session["session_id"] = session_id
+    return jsonify({"session_id": session_id})
+
+#lists all chat sessions for the authenticated user
 @app.route("/api/chat/sessions", methods=["GET"])
 def list_sessions():
     try:
-        token = request.args.get("token")
         user_id = session.get("user_id")
-        if token and not user_id:
-            try:
-                parts = str(token).split("-")
-                if len(parts) >= 2:
-                    session["user_id"] = parts[-1]
-                    user_id = session["user_id"]
-            except Exception:
-                pass
-        if not user_id:
-            return jsonify([])
         sessions = get_user_chat_sessions(user_id)
-        # Normalize for frontend expectations
         data = [
             {
                 "id": s["session_id"],

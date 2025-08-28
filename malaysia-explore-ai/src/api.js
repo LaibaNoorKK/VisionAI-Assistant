@@ -63,3 +63,14 @@ export const fetchSessionsWithToken = async (token) => {
     throw error.response?.data || { detail: "Failed to load sessions" };
   }
 };
+
+// ---- Create New Chat Session on clicking new chat button ----
+export const createNewChatSession = async () => {
+  try {
+    const response = await API.post("/api/chat/new_session");
+    return response.data; // { session_id: ... }
+  } catch (error) {
+    throw error.response?.data || { detail: "Failed to create new chat session" };
+  }
+};
+
