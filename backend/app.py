@@ -72,17 +72,23 @@ def chat():
             if category in category_mapping:
                 question = category_mapping[category]
                 if question in PREDEFINED_QAS:
+                                        # Save both user and AI message to DB
+                    history, user_id, session_id = get_chat_history(
+                        session.get("user_id"), session.get("session_id")
+                    )
+                    history.add_user_message(user_message)
+                    history.add_ai_message(PREDEFINED_QAS[question])
                     return jsonify({"reply": PREDEFINED_QAS[question]})
 
         # Load history from DB
         history, user_id, session_id = get_chat_history(
             session.get("user_id"), session.get("session_id")
         )
-
+        history.add_user_message(user_message)
         # Run AI (run_supervisor handles saving both user and AI messages)
         assistant_reply = run_supervisor(user_message, history)
 
-        return jsonify({"reply": assistant_reply})
+        return jsonify({"reply": assistant_reply,"session_id": session_id})
     except Exception as e:
         logging.exception("Error in /api/chat")
         return jsonify({"error": str(e)}), 500

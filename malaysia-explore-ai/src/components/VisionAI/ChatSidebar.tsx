@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageSquare, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { fetchSessionsWithToken } from "../../api"; // adjust import
 
 interface ChatSession {
   id: string;
@@ -16,19 +17,30 @@ interface ChatSidebarProps {
   onNewChat?: () => void;
 }
 
-const defaultSessions: ChatSession[] = [
-  { id: "1", title: "How do I apply for a student visa in Malaysia?", isActive: true },
-  { id: "2", title: "What is the cost of living for a student in Malaysia?" },
-  { id: "3", title: "Tell me more about asia pacific university" }
-];
 
 const ChatSidebar = ({ 
   isOpen, 
   onToggle, 
-  sessions = defaultSessions, 
   onSessionClick, 
   onNewChat 
 }: ChatSidebarProps) => {
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const data = await fetchSessionsWithToken(); // uses cookie session
+        setSessions(data);
+      } catch (err) {
+        console.error("❌ Failed to load sessions", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSessions();
+  }, []);
   return (
     <>
       {/* Toggle Button */}

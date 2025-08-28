@@ -72,6 +72,8 @@ class SimplePostgresChatMessageHistory:
 def get_chat_history(user_id=None, session_id=None):
     if not user_id:
         user_id = f"guest-{uuid.uuid4()}"
+    else:
+        user_id = str(user_id)
     if not session_id:
         session_id = str(uuid.uuid4())
 
@@ -85,6 +87,7 @@ def get_user_chat_sessions(user_id):
     Returns a list of chat sessions for a given user.
     Each session contains session_id, first_time, and title (first message content).
     """
+    user_id = str(user_id)
     sessions = []
     try:
         with get_psycopg_connection() as conn:
