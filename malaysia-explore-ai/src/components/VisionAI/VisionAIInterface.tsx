@@ -24,6 +24,7 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -68,15 +69,16 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
     // Handle browse prompts
   };
 
-  const handleSessionClick = (sessionId: string) => {
-    console.log("Session clicked:", sessionId);
-    // Handle session selection
+  const handleNewChat = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    setMessages([]);
+    setShowChat(false);
+    // Optionally, fetch messages for the new session
   };
 
-  const handleNewChat = () => {
-    console.log("New chat clicked");
-    setMessages([]);
-    setShowChat(false); // Hide chat section, show category buttons
+  const handleSessionClick = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    // Optionally, fetch messages for the selected session
   };
 
   const handleSendMessage = async (message: string) => {
@@ -236,7 +238,7 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
       <ChatSidebar
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        sessions={sessions.map((s, i) => ({ id: s.id, title: s.title, isActive: false }))}
+        sessions={sessions.map((s, i) => ({ id: s.id, title: s.title, isActive: s.id === currentSessionId }))}
         onSessionClick={handleSessionClick}
         onNewChat={handleNewChat}
       />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { MessageSquare, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { fetchSessionsWithToken } from "../../api"; // adjust import
+import { fetchSessionsWithToken, createNewChatSession } from "../../api"; // <-- import the API
 
 interface ChatSession {
   id: string;
@@ -14,9 +14,8 @@ interface ChatSidebarProps {
   onToggle: () => void;
   sessions?: ChatSession[];
   onSessionClick?: (sessionId: string) => void;
-  onNewChat?: () => void;
+  onNewChat?: (sessionId: string) => void; // <-- pass sessionId
 }
-
 
 const ChatSidebar = ({ 
   isOpen, 
@@ -30,7 +29,7 @@ const ChatSidebar = ({
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        const data = await fetchSessionsWithToken(); // uses cookie session
+        const data = await fetchSessionsWithToken();
         setSessions(data);
       } catch (err) {
         console.error("❌ Failed to load sessions", err);
@@ -41,6 +40,19 @@ const ChatSidebar = ({
 
     loadSessions();
   }, []);
+
+  // New Chat Button handler
+  const handleNewChatClick = async () => {
+    try {
+      const result = await createNewChatSession();
+      const updatedSessions = await fetchSessionsWithToken();
+      setSessions(updatedSessions);
+      if (onNewChat) onNewChat(result.session_id); // <-- pass session_id
+    } catch (err) {
+      console.error("❌ Failed to create new chat session", err);
+    }
+  };
+
   return (
     <>
       {/* Toggle Button */}
@@ -77,7 +89,7 @@ const ChatSidebar = ({
 
           {/* New Chat Button */}
           <Button
-            onClick={onNewChat}
+            onClick={handleNewChatClick} // <-- use the new handler
             className="w-full mb-4 bg-[hsl(var(--category-green))] hover:bg-[hsl(var(--category-green))]/90 text-white rounded-full"
           >
             <Plus size={16} className="mr-2" />
