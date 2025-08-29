@@ -4,7 +4,14 @@ import MainHeading from "./MainHeading";
 import CategoryButtons from "./CategoryButtons";
 import SearchInput from "./SearchInput";
 import ChatSidebar from "./ChatSidebar";
-import { fetchSessionsWithToken, sendMessageWithToken } from "../../api";
+import {
+  createNewChatSession,
+  fetchSessions,
+  getSessionMessages,
+  switchToSession,
+  sendMessage
+} from "../../services/chatservice";
+
 
 interface Message {
   id: string;
@@ -13,32 +20,48 @@ interface Message {
   timestamp: Date;
 }
 
+
 interface VisionAIInterfaceProps {
   userName?: string;
   token?: string;
 }
 
+
 const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterfaceProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sessions, setSessions] = useState<{ id: string; title: string }[]>([]);
+  const [sessions, setSessions] = useState<{ id: string; title: string; first_time?: string }[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+
+  // Load sessions on component mount
   useEffect(() => {
-    // Load chat sessions for sidebar
-    fetchSessionsWithToken(token).then(setSessions).catch(() => {});
+    loadSessions();
   }, []);
+
+
+  const loadSessions = async () => {
+    try {
+      const sessionsData = await fetchSessions();
+      setSessions(sessionsData);
+    } catch (error) {
+      console.error("Failed to load sessions:", error);
+    }
+  };
+
 
   const handleCategoryClick = (categoryId: string) => {
     console.log("Category clicked:", categoryId);
@@ -47,11 +70,13 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
     handleSendMessage(`I'm interested in ${categoryId}`);
   };
 
+
   const handleSearch = (query: string) => {
     console.log("Search query:", query);
     setShowChat(true); // Show chat section
     handleSendMessage(query);
   };
+
 
   const handleQuestionClick = (question: string) => {
     console.log("Question clicked:", question);
@@ -59,30 +84,71 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
     handleSendMessage(question);
   };
 
+
   const handleAttach = () => {
     console.log("Attach clicked");
     // Handle file attachment
   };
+
 
   const handleBrowsePrompts = () => {
     console.log("Browse prompts clicked");
     // Handle browse prompts
   };
 
-  const handleNewChat = (sessionId: string) => {
-    setCurrentSessionId(sessionId);
-    setMessages([]);
-    setShowChat(false);
-    // Optionally, fetch messages for the new session
+
+  const handleSessionClick = async (sessionId: string) => {
+    console.log("Session clicked:", sessionId);
+    try {
+      setIsLoading(true);
+      // Switch to the selected session
+      await switchToSession(sessionId);
+      setCurrentSessionId(sessionId);
+     
+      // Load messages for this session
+      const response = await getSessionMessages(sessionId);
+      const sessionMessages: Message[] = response.messages.map((msg, index) => ({
+        id: `${sessionId}-${index}`,
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        timestamp: new Date(msg.timestamp || Date.now()),
+      }));
+     
+      setMessages(sessionMessages);
+      setShowChat(true);
+    } catch (error) {
+      console.error("Failed to load session:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSessionClick = (sessionId: string) => {
-    setCurrentSessionId(sessionId);
-    // Optionally, fetch messages for the selected session
+
+  const handleNewChat = async () => {
+    console.log("New chat clicked");
+    try {
+      setIsLoading(true);
+      const response = await createNewChatSession();
+      setCurrentSessionId(response.session_id);
+      setMessages([]);
+      setShowChat(false); // Hide chat section, show category buttons
+      setSessions(prev => [
+        { id: response.session_id, title: "New Chat",first_time: new Date().toISOString(), ...prev, }
+        
+      ]);
+      // Reload sessions to include the new one
+      await loadSessions();
+    } catch (error) {
+      console.error("Failed to create new chat:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   const handleSendMessage = async (message: string) => {
     if (!message.trim() || isLoading) return;
+
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -91,12 +157,14 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
       timestamp: new Date(),
     };
 
+
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
+
     try {
-      const response = await sendMessageWithToken(message, token);
-      
+      const response = await sendMessage(message);
+     
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -104,13 +172,29 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
         timestamp: new Date(),
       };
 
+
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+     
+      // Reload sessions to update titles
+      await loadSessions();
+    } catch (error: any) {
       console.error("Chat error:", error);
+      let errorContent = "Sorry, I'm having trouble connecting to the server. Please try again.";
+     
+      if (error.detail) {
+        errorContent = error.detail;
+      } else if (error.message) {
+        if (error.message.includes('Network Error') || error.message.includes('ECONNREFUSED')) {
+          errorContent = "Unable to connect to the server. Please check if the backend is running.";
+        } else if (error.message.includes('timeout')) {
+          errorContent = "Request timed out. Please try again.";
+        }
+      }
+     
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Sorry, I'm having trouble connecting to the server. Please try again.",
+        content: errorContent,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -118,6 +202,7 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
       setIsLoading(false);
     }
   };
+
 
   // Minimal markdown formatter for assistant messages (bold, bullets, line breaks)
   const simpleMarkdownToHtml = (md: string) => {
@@ -144,6 +229,7 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
     return converted.join('');
   };
 
+
   return (
     <div className="min-h-screen relative overflow-x-hidden bg-gray-50">
       {/* Header with branding */}
@@ -155,20 +241,21 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
         </div>
       </header>
 
+
       {/* Main Content */}
       <main className="px-4 pb-12">
         <div className="max-w-6xl mx-auto">
           {/* Robot Mascot */}
           <RobotMascot userName={userName} />
-          
+         
           {/* Main Heading */}
           <MainHeading userName={userName} />
-          
+         
           {/* Category Buttons - Only show when no chat is active */}
           {!showChat && (
             <CategoryButtons onCategoryClick={handleCategoryClick} />
           )}
-          
+         
           {/* Chat Messages - Show above input when chat is active */}
           {showChat && (
             <div className="mt-8 max-w-4xl mx-auto mb-6">
@@ -222,10 +309,10 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
               </div>
             </div>
           )}
-          
+         
           {/* Search Input */}
           <div className="flex justify-center">
-            <SearchInput 
+            <SearchInput
               onSearch={handleSearch}
               onAttach={handleAttach}
               onBrowsePrompts={handleBrowsePrompts}
@@ -234,16 +321,22 @@ const VisionAIInterface = ({ userName = "Ammar", token = "" }: VisionAIInterface
         </div>
       </main>
 
+
       {/* Chat Sidebar */}
       <ChatSidebar
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        sessions={sessions.map((s, i) => ({ id: s.id, title: s.title, isActive: s.id === currentSessionId }))}
+        sessions={sessions.map((s, i) => ({ id: s.id, title: s.title, isActive: false }))}
         onSessionClick={handleSessionClick}
         onNewChat={handleNewChat}
+        currentSessionId={currentSessionId}
       />
     </div>
   );
 };
 
+
 export default VisionAIInterface;
+
+
+
