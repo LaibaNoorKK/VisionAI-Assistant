@@ -123,10 +123,6 @@ def create_new_chat_session(user_id):
 
     return session_id
 
-
-
-
-
 def get_session_messages_by_id(user_id, session_id):
     """
     Get all messages for a specific session ID.
