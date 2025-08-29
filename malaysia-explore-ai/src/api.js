@@ -74,3 +74,51 @@ export const createNewChatSession = async () => {
   }
 };
 
+
+// ---- Get Session Messages ----
+export const getSessionMessages = async (sessionId) => {
+  try {
+    const response = await API.get(`/api/chat/session/${sessionId}/messages`);
+    return response.data; // { messages: [...], session_id: ... }
+  } catch (error) {
+    throw error.response?.data || { detail: "Failed to load session messages" };
+  }
+};
+
+
+export const getSessionMessagesWithToken = async (sessionId, token) => {
+  try {
+    const response = await API.get(`/api/chat/session/${sessionId}/messages`, {
+      params: { token }
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || { detail: "Failed to load session messages" };
+  }
+};
+
+
+// ---- Switch to Session ----
+export const switchToSession = async (sessionId) => {
+  try {
+    const response = await API.post(`/api/chat/session/${sessionId}/switch`);
+    return response.data; // { session_id: ..., message: ... }
+  } catch (error) {
+    throw error.response?.data || { detail: "Failed to switch session" };
+  }
+};
+
+
+export const switchToSessionWithToken = async (sessionId, token) => {
+  try {
+    const response = await API.post(`/api/chat/session/${sessionId}/switch`, null, {
+      params: { token }
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || { detail: "Failed to switch session" };
+  }
+};
+
+
+
