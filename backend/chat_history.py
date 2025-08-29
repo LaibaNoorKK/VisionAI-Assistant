@@ -113,3 +113,75 @@ def get_user_chat_sessions(user_id):
     except Exception as e:
         print(f"Error fetching chat sessions: {e}")
     return sessions
+
+def create_new_chat_session(user_id):
+    """
+    Creates a new chat session for a given user and returns the session_id.
+    """
+    user_id = str(user_id)
+    session_id = str(uuid.uuid4())
+
+    return session_id
+
+
+
+
+
+def get_session_messages_by_id(user_id, session_id):
+    """
+    Get all messages for a specific session ID.
+    Returns a list of message objects with role, content, and timestamp.
+    """
+    user_id = str(user_id)
+    session_id = str(session_id)
+    messages = []
+   
+    try:
+        with get_psycopg_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                query = f"""
+                    SELECT role, content, created_at
+                    FROM {TABLE_NAME}
+                    WHERE user_id = %s AND session_id = %s AND role != 'system'
+                    ORDER BY created_at ASC
+                """
+                cur.execute(query, (user_id, session_id))
+                rows = cur.fetchall()
+               
+                for row in rows:
+                    messages.append({
+                        "role": row['role'],
+                        "content": row['content'],
+                        "timestamp": row['created_at'].isoformat() if row['created_at'] else None
+                    })
+    except Exception as e:
+        print(f"Error fetching session messages: {e}")
+   
+    return messages
+
+
+
+
+def verify_session_ownership(user_id, session_id):
+    """
+    Verify that a session belongs to the specified user.
+    Returns True if the session exists and belongs to the user, False otherwise.
+    """
+    user_id = str(user_id)
+    session_id = str(session_id)
+   
+    try:
+        with get_psycopg_connection() as conn:
+            with conn.cursor() as cur:
+                query = f"""
+                    SELECT COUNT(*)
+                    FROM {TABLE_NAME}
+                    WHERE user_id = %s AND session_id = %s
+                """
+                cur.execute(query, (user_id, session_id))
+                count = cur.fetchone()[0]
+                return count > 0
+    except Exception as e:
+        print(f"Error verifying session ownership: {e}")
+        return False
+

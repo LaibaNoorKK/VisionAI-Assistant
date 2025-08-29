@@ -63,21 +63,3 @@ def run_supervisor(input_text, history):
                     history.add_ai_message(msg.content)
                     return msg.content
     return "📡 No content returned."
-
-def create_new_chat_session(user_id):
-    """
-    Create a new chat session for the given user.
-    Saves the session to the database using psycopg2.
-    Returns the new session_id.
-    """
-    import uuid
-    session_id = str(uuid.uuid4())
-    with get_psycopg_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            query = """
-                INSERT INTO chat_sessions (user_id, session_id)
-                VALUES (%s, %s)
-            """
-            cur.execute(query, (user_id, session_id))
-        conn.commit()
-    return session_id

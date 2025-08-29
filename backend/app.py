@@ -7,8 +7,8 @@ import os
 import logging
 
 # Import your agent logic
-from chat_history import get_chat_history
-from agent import run_supervisor,create_new_chat_session
+from chat_history import get_chat_history, get_user_chat_sessions, get_session_messages_by_id, verify_session_ownership,create_new_chat_session
+from agent import run_supervisor
 from qna_data import PREDEFINED_QAS
 from chat_history import get_user_chat_sessions
 
@@ -91,28 +91,6 @@ def chat():
     except Exception as e:
         logging.exception("Error in /api/chat")
         return jsonify({"error": str(e)}), 500
-
-
-# ---------------------------
-# Category Endpoint
-# ---------------------------
-@app.route("/api/category/<category_name>", methods=["GET"])
-def get_category_answer(category_name):
-    """Get predefined answer for category button clicks"""
-    category_mapping = {
-        "popular-majors": "What are the most popular majors in Malaysia?",
-        "malaysia-visa-requirements": "How do I apply for a student visa in Malaysia?",
-        "scholarship-options": "What are the scholarship opportunities for international students?",
-        "top-malaysian-universities": "What are the top universities in Malaysia?",
-        "international-student-guide": "What is the cost of living for a student in Malaysia?"
-    }
-    
-    if category_name in category_mapping:
-        question = category_mapping[category_name]
-        if question in PREDEFINED_QAS:
-            return jsonify({"reply": PREDEFINED_QAS[question]})
-    
-    return jsonify({"error": "Category not found"}), 404
 
 
 # ---------------------------
@@ -205,6 +183,43 @@ def list_sessions():
         logging.exception("Error in /api/chat/sessions")
         return jsonify({"error": str(e)}), 500
 
+#get all messages for a specific session
+@app.route("/api/chat/session/<session_id>/messages", methods=["GET"])
+def get_session_messages(session_id):
+    try:
+        user_id = session.get("user_id")
+        if not user_id:
+            return jsonify({"error": "User not authenticated"}), 401
+
+
+        # Get messages for the specific session
+        messages = get_session_messages_by_id(user_id, session_id)
+        return jsonify({"messages": messages, "session_id": session_id})
+    except Exception as e:
+        logging.exception("Error in /api/chat/session/<session_id>/messages")
+        return jsonify({"error": str(e)}), 500
+
+
+#switch to a specific session
+@app.route("/api/chat/session/<session_id>/switch", methods=["POST"])
+def switch_session(session_id):
+    try:
+        user_id = session.get("user_id")
+        if not user_id:
+            return jsonify({"error": "User not authenticated"}), 401
+
+
+        # Verify the session belongs to the user
+        if not verify_session_ownership(user_id, session_id):
+            return jsonify({"error": "Session not found or access denied"}), 404
+
+
+        # Switch to the session
+        session["session_id"] = session_id
+        return jsonify({"session_id": session_id, "message": "Session switched successfully"})
+    except Exception as e:
+        logging.exception("Error in /api/chat/session/<session_id>/switch")
+        return jsonify({"error": str(e)}), 500
 
 # ---------------------------
 # Run
