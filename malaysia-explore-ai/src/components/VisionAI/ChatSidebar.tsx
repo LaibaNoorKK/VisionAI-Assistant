@@ -1,35 +1,44 @@
 import { useEffect, useState } from "react";
 import { MessageSquare, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { fetchSessionsWithToken, createNewChatSession } from "../../api"; // <-- import the API
+import { fetchSessions } from "../../services/chatservice";
+
 
 interface ChatSession {
   id: string;
   title: string;
   isActive?: boolean;
+  first_time?: string;
 }
+
 
 interface ChatSidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   sessions?: ChatSession[];
   onSessionClick?: (sessionId: string) => void;
-  onNewChat?: (sessionId: string) => void; // <-- pass sessionId
+  onNewChat?: () => void;
+  currentSessionId?: string | null;
 }
 
-const ChatSidebar = ({ 
-  isOpen, 
-  onToggle, 
-  onSessionClick, 
-  onNewChat 
+
+const ChatSidebar = ({
+  isOpen,
+  onToggle,
+  onSessionClick,
+  onNewChat,
+  currentSessionId,
+  sessions: propSessions
 }: ChatSidebarProps) => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
 
+
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        const data = await fetchSessionsWithToken();
+        setLoading(true);
+        const data = await fetchSessions();
         setSessions(data);
       } catch (err) {
         console.error("❌ Failed to load sessions", err);
@@ -38,20 +47,14 @@ const ChatSidebar = ({
       }
     };
 
+
     loadSessions();
   }, []);
 
-  // New Chat Button handler
-  const handleNewChatClick = async () => {
-    try {
-      const result = await createNewChatSession();
-      const updatedSessions = await fetchSessionsWithToken();
-      setSessions(updatedSessions);
-      if (onNewChat) onNewChat(result.session_id); // <-- pass session_id
-    } catch (err) {
-      console.error("❌ Failed to create new chat session", err);
-    }
-  };
+
+  // Prefer sessions from parent if provided, else use locally fetched list
+  const renderedSessions = (propSessions && propSessions.length > 0) ? propSessions : sessions;
+
 
   return (
     <>
@@ -63,6 +66,7 @@ const ChatSidebar = ({
       >
         <MessageSquare size={18} />
       </Button>
+
 
       {/* Sidebar */}
       <div className={`
@@ -87,42 +91,61 @@ const ChatSidebar = ({
             </Button>
           </div>
 
+
           {/* New Chat Button */}
           <Button
-            onClick={handleNewChatClick} // <-- use the new handler
+            onClick={onNewChat}
             className="w-full mb-4 bg-[hsl(var(--category-green))] hover:bg-[hsl(var(--category-green))]/90 text-white rounded-full"
           >
             <Plus size={16} className="mr-2" />
             New Chat
           </Button>
 
+
           {/* Session List */}
           <div className="space-y-2">
-            {sessions.map((session) => (
-              <button
-                key={session.id}
-                onClick={() => onSessionClick?.(session.id)}
-                className={`
-                  w-full text-left p-3 rounded-xl text-sm
-                  transition-all duration-200
-                  ${session.isActive 
-                    ? 'bg-[hsl(var(--category-green))]/10 border-2 border-[hsl(var(--category-green))] text-[hsl(var(--category-green))]' 
-                    : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-2 border-transparent'
-                  }
-                `}
-              >
-                <div className="truncate">
-                  {session.title}
-                </div>
-              </button>
-            ))}
+            {loading ? (
+              <div className="text-center py-4 text-gray-500">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>
+                Loading sessions...
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="text-center py-4 text-gray-500">
+                No chat sessions yet
+              </div>
+            ) : (
+              renderedSessions.map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => onSessionClick?.(session.id)}
+                  className={`
+                    w-full text-left p-3 rounded-xl text-sm
+                    transition-all duration-200
+                    ${session.id === currentSessionId
+                      ? 'bg-[hsl(var(--category-green))]/10 border-2 border-[hsl(var(--category-green))] text-[hsl(var(--category-green))]'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-2 border-transparent'
+                    }
+                  `}
+                >
+                  <div className="truncate font-medium">
+                    {session.title || 'New Chat'}
+                  </div>
+                  {session.first_time && (
+                    <div className="text-xs opacity-70 mt-1">
+                      {new Date(session.first_time).toLocaleDateString()}
+                    </div>
+                  )}
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>
 
+
       {/* Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/20 z-30"
           onClick={onToggle}
         />
@@ -130,5 +153,6 @@ const ChatSidebar = ({
     </>
   );
 };
+
 
 export default ChatSidebar;
